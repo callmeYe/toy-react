@@ -1,8 +1,14 @@
+let childrenSymbol = Symbol("children");
 class ElementWrapper {
     constructor(type) {
         this.type = type;
         this.props = Object.create(null);
+        this[childrenSymbol] = [];
         this.children = [];
+    }
+
+    get vdom() {
+        return this;
     }
 
     setAttribute(name, value) {
@@ -10,10 +16,17 @@ class ElementWrapper {
     }
 
     appendChild(vchild) {
-        this.children.push(vchild)
+        this.children.push(vchild.vdom);
+        this[childrenSymbol].push(vchild);
     }
 
     mountTo(domRange) {
+        const placeholder = document.createComment("");
+        let placeholderRange = document.createRange();
+        placeholderRange.setStart(domRange.endContainer,domRange.endOffset);
+        placeholderRange.setEnd(domRange.endContainer,domRange.endOffset);
+        placeholderRange.insertNode(placeholder);
+
         domRange.deleteContents();
 
         let element = document.createElement(this.type);
@@ -57,6 +70,11 @@ class TextWrapper {
         this.props = Object.create(null);
         this.children = [];
     }
+
+    get vdom() {
+        return this;
+    }
+
     mountTo(domRange) {
         domRange.deleteContents();
         domRange.insertNode(this.root);
@@ -74,6 +92,10 @@ export class Component {
         return this.constructor.name;
     }
 
+    get vdom() {
+        return this.render()
+    }
+
     setAttribute(name, value) {
         this[name] = value;
         this.props[name] = value;
@@ -89,8 +111,9 @@ export class Component {
     }
 
     update() {
-        let vdom = this.render();
-        if (this.vdom) {
+        console.log(this.vdom);
+        let vdom = this.vdom;
+        if (this.oldVdom) {
             const isSameNode = (node1, node2) => {
                 if (node1.type !== node2.type) {
                     return false
@@ -132,13 +155,11 @@ export class Component {
                 }
             }
 
-            replceTree(this.vdom, vdom)
-
-
+            replceTree(this.oldVdom, vdom)
         } else {
             vdom.mountTo(this.domRange)
         }
-        this.vdom = vdom;
+        this.oldVdom = vdom;
     }
 
     setState(state) {
@@ -161,7 +182,6 @@ export class Component {
 
         //rerender
         this.update();
-        console.log(this.state)
     }
 }
 
